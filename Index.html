@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vehículos y propiedades RR</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- React & ReactDOM -->
+    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+    <!-- Babel para traducir JSX en el navegador -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        .animate-fade-in-up { animation: fadeInUp 0.5s ease-out; }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-slate-900">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // --- ICONOS SVG (Reemplazo de lucide-react para HTML standalone) ---
+        const Icon = ({ path, className, fill = "none" }) => (
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
+                {path}
+            </svg>
+        );
+
+        const Icons = {
+            Car: (props) => <Icon {...props} path={<><path d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2"/><circle cx="7" cy="17" r="2"/><circle cx="17" cy="17" r="2"/></>} />,
+            Home: (props) => <Icon {...props} path={<><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></>} />,
+            Heart: ({className, fill, ...props}) => <Icon {...props} className={className} fill={fill ? "currentColor" : "none"} path={<path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/>} />,
+            Lock: (props) => <Icon {...props} path={<><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></>} />,
+            Plus: (props) => <Icon {...props} path={<><path d="M5 12h14"/><path d="M12 5v14"/></>} />,
+            Trash2: (props) => <Icon {...props} path={<><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/><line x1="10" x2="10" y1="11" y2="17"/><line x1="14" x2="14" y1="11" y2="17"/></>} />,
+            Check: (props) => <Icon {...props} path={<polyline points="20 6 9 17 4 12"/>} />,
+            X: (props) => <Icon {...props} path={<><path d="M18 6 6 18"/><path d="m6 6 18 12"/></>} />,
+            ImageIcon: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21"/></>} />,
+            Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>} />,
+            LogOut: (props) => <Icon {...props} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>} />,
+            Camera: (props) => <Icon {...props} path={<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>} />
+        };
+
+        // --- Datos Iniciales ---
+        const INITIAL_DATA = [
+            {
+                id: 1,
+                type: 'vehicle',
+                title: 'Toyota Hilux 2023 Full Equipo',
+                price: 325000,
+                description: 'Camioneta en excelente estado, motor 2.8 Turbo Diesel, 4x4, asientos de cuero, único dueño. Todos los servicios en agencia.',
+                images: [
+                'https://images.unsplash.com/photo-1533473359331-0135ef1bcfb0?auto=format&fit=crop&q=80&w=1000',
+                'https://images.unsplash.com/photo-1583121274602-3e2820c69888?auto=format&fit=crop&q=80&w=1000'
+                ],
+                coverIndex: 0,
+                isFavorite: false
+            },
+            {
+                id: 2,
+                type: 'property',
+                title: 'Casa en Carretera a El Salvador',
+                price: 1850000,
+                description: 'Hermosa residencia dentro de condominio. 4 habitaciones, 3.5 baños, jardín amplio, pérgola y parqueo para 3 vehículos.',
+                images: [
+                'https://images.unsplash.com/photo-1600596542815-2a4d04774c13?auto=format&fit=crop&q=80&w=1000',
+                'https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?auto=format&fit=crop&q=80&w=1000'
+                ],
+                coverIndex: 0,
+                isFavorite: false
+            }
+        ];
+
+        // --- Componente Principal ---
+        function App() {
+            // Estado Global
+            const [view, setView] = useState('home'); // home, details, adminLogin, adminDashboard, create
+            const [items, setItems] = useState(() => {
+                const saved = localStorage.getItem('catalog_items');
+                return saved ? JSON.parse(saved) : INITIAL_DATA;
+            });
+            const [favorites, setFavorites] = useState([]);
+            const [selectedItem, setSelectedItem] = useState(null);
+            const [filter, setFilter] = useState('all'); // all, vehicle, property
+            
+            // Estado Admin
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [loginEmail, setLoginEmail] = useState('');
+            const [loginPass, setLoginPass] = useState('');
+            const [loginError, setLoginError] = useState('');
+
+            useEffect(() => {
+                try {
+                    localStorage.setItem('catalog_items', JSON.stringify(items));
+                } catch (e) {
+                    console.error("Error guardando en localStorage", e);
+                    alert("Atención: El almacenamiento local está lleno. Algunas imágenes podrían no guardarse.");
+                }
+            }, [items]);
+
+            const formatCurrency = (amount) => {
+                return new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(amount);
+            };
+
+            const toggleFavorite = (e, id) => {
+                e.stopPropagation();
+                if (favorites.includes(id)) {
+                    setFavorites(favorites.filter(favId => favId !== id));
+                } else {
+                    setFavorites([...favorites, id]);
+                }
+            };
+
+            // --- Vistas ---
+
+            const AdminLogin = () => {
+                const handleLogin = (e) => {
+                    e.preventDefault();
+                    if (loginEmail === 'juanr502@yahoo.es' && loginPass === 'juanjose') {
+                        setIsAdmin(true);
+                        setView('adminDashboard');
+                        setLoginError('');
+                    } else {
+                        setLoginError('Credenciales incorrectas');
+                    }
+                };
+
+                return (
+                    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+                            <div className="text-center mb-6">
+                                <div className="w-12 h-12 mx-auto mb-2 text-slate-800 flex justify-center"><Icons.Lock /></div>
+                                <h2 className="text-2xl font-bold text-slate-800">Administración</h2>
+                                <p className="text-gray-500 text-sm">Ingreso exclusivo para personal autorizado</p>
+                            </div>
+                            <form onSubmit={handleLogin} className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                                    <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
+                                        placeholder="juanr502@yahoo.es" />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                                    <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
+                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
+                                        placeholder="••••••••" />
+                                </div>
+                                {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
+                                <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition">Ingresar</button>
+                                <button onClick={() => setView('home')} type="button" className="w-full py-2 text-slate-600 text-sm hover:underline">Volver a la tienda</button>
+                            </form>
+                        </div>
+                    </div>
+                );
+            };
+
+            const CreateListing = () => {
+                const [newItem, setNewItem] = useState({
+                    type: 'vehicle', title: '', price: '', description: '', images: [], coverIndex: 0
+                });
+                const [isUploading, setIsUploading] = useState(false);
+
+                const handleFileSelect = (e) => {
+                    if (e.target.files && e.target.files.length > 0) {
+                        setIsUploading(true);
+                        const files = Array.from(e.target.files);
+                        const readers = files.map(file => new Promise((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onloadend = () => resolve(reader.result);
+                            reader.onerror = reject;
+                            reader.readAsDataURL(file);
+                        }));
+
+                        Promise.all(readers).then(newImages => {
+                            setNewItem(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
+                            setIsUploading(false);
+                        }).catch(err => {
+                            console.error("Error", err);
+                            setIsUploading(false);
+                            alert("Error al cargar imágenes.");
+                        });
+                    }
+                };
+
+                const handleRemoveImage = (index) => {
+                    const updated = newItem.images.filter((_, i) => i !== index);
+                    setNewItem({ ...newItem, images: updated, coverIndex: newItem.coverIndex >= updated.length ? 0 : newItem.coverIndex });
+                };
+
+                const handleSubmit = (e) => {
+                    e.preventDefault();
+                    if (!newItem.title || !newItem.price || !newItem.description) return alert("Llena todos los campos.");
+                    if (newItem.images.length === 0) return alert("Sube al menos una foto.");
+                    setItems([{ ...newItem, id: Date.now(), price: parseFloat(newItem.price), isFavorite: false }, ...items]);
+                    setView('adminDashboard');
+                };
+
+                return (
+                    <div className="min-h-screen bg-gray-50 pb-20">
+                        <header className="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center">
+                            <h2 className="text-lg font-bold flex items-center gap-2"><Icons.Plus className="w-5 h-5"/> Nuevo Anuncio</h2>
+                            <button onClick={() => setView('adminDashboard')} className="text-sm bg-slate-700 px-3 py-1 rounded hover:bg-slate-600">Cancelar</button>
+                        </header>
+                        <main className="max-w-2xl mx-auto p-4 md:p-8">
+                            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+                                <div>
+                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
+                                    <div className="flex gap-4">
+                                        <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${newItem.type === 'vehicle' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
+                                            <input type="radio" name="type" className="hidden" checked={newItem.type === 'vehicle'} onChange={() => setNewItem({...newItem, type: 'vehicle'})} />
+                                            <Icons.Car className="w-5 h-5"/> Vehículo
+                                        </label>
+                                        <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${newItem.type === 'property' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
+                                            <input type="radio" name="type" className="hidden" checked={newItem.type === 'property'} onChange={() => setNewItem({...newItem, type: 'property'})} />
+                                            <Icons.Home className="w-5 h-5"/> Propiedad
+                                        </label>
+                                    </div>
+                                </div>
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Título</label><input type="text" required value={newItem.title} onChange={(e) => setNewItem({...newItem, title: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Ej. Honda Civic 2020"/></div>
+                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio (Q)</label><input type="number" required value={newItem.price} onChange={(e) => setNewItem({...newItem, price: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="0.00"/></div>
+                                </div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label><textarea required rows={4} value={newItem.description} onChange={(e) => setNewItem({...newItem, description: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Detalles..."></textarea></div>
+                                <div>
+                                    <div className="flex justify-between items-center mb-2"><label className="block text-sm font-medium text-gray-700">Fotos</label><span className="text-xs text-gray-500">{newItem.images.length} fotos</span></div>
+                                    <div className="mb-4">
+                                        <label className="w-full flex flex-col items-center px-4 py-6 bg-white text-slate-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue cursor-pointer hover:bg-slate-50 hover:text-slate-800 transition border-dashed border-2 border-slate-300">
+                                            <Icons.Camera className="w-8 h-8"/> <span className="mt-2 text-sm">Seleccionar fotos</span>
+                                            <input type='file' multiple accept="image/*" className="hidden" onChange={handleFileSelect} />
+                                        </label>
+                                        {isUploading && <p className="text-center text-xs text-blue-600 mt-2">Procesando...</p>}
+                                    </div>
+                                    {newItem.images.length > 0 && (
+                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                            {newItem.images.map((img, idx) => (
+                                                <div key={idx} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${newItem.coverIndex === idx ? 'border-slate-900 ring-2 ring-slate-900' : 'border-gray-200'}`}>
+                                                    <img src={img} className="w-full h-full object-cover" />
+                                                    <input type="radio" name="cover" checked={newItem.coverIndex === idx} onChange={() => setNewItem({...newItem, coverIndex: idx})} className="absolute top-2 left-2 w-4 h-4 cursor-pointer accent-slate-900"/>
+                                                    <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 hover:text-red-700"><Icons.Trash2 className="w-3 h-3"/></button>
+                                                    {newItem.coverIndex === idx && <div className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[10px] text-center py-1">Portada</div>}
+                                                </div>
+                                            ))}
+                                        </div>
+                                    )}
+                                </div>
+                                <button type="submit" disabled={isUploading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-lg mt-4 disabled:opacity-50">Publicar</button>
+                            </form>
+                        </main>
+                    </div>
+                );
+            };
+
+            const AdminDashboard = () => {
+                const handleDelete = (id) => {
+                    if (confirm('¿Eliminar anuncio?')) setItems(items.filter(item => item.id !== id));
+                };
+
+                return (
+                    <div className="min-h-screen bg-gray-50">
+                        <header className="bg-white border-b sticky top-0 z-10">
+                            <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <h1 className="text-xl font-bold text-slate-900">Panel de Control</h1>
+                                <div className="flex gap-4 items-center">
+                                    <span className="text-sm text-gray-500 hidden md:block">Hola, Juan José</span>
+                                    <button onClick={() => { setIsAdmin(false); setView('home'); }} className="flex items-center gap-2 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition"><Icons.LogOut className="w-4 h-4"/> Salir</button>
+                                </div>
+                            </div>
+                        </header>
+                        <main className="max-w-7xl mx-auto px-4 py-8">
+                            <div className="flex justify-between items-center mb-8">
+                                <h2 className="text-2xl font-bold text-slate-800">Tus Publicaciones</h2>
+                                <button onClick={() => setView('create')} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"><Icons.Plus className="w-5 h-5"/> Nueva Publicación</button>
+                            </div>
+                            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                                <div className="overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-slate-50 text-slate-600 text-sm uppercase"><tr><th className="p-4">Anuncio</th><th className="p-4">Tipo</th><th className="p-4">Precio</th><th className="p-4 text-right">Acciones</th></tr></thead>
+                                        <tbody className="divide-y divide-gray-100">
+                                            {items.map(item => (
+                                                <tr key={item.id} className="hover:bg-slate-50 transition">
+                                                    <td className="p-4"><div className="flex items-center gap-3"><img src={item.images[item.coverIndex]} className="w-12 h-12 rounded object-cover bg-gray-200" /><span className="font-medium text-gray-900">{item.title}</span></div></td>
+                                                    <td className="p-4"><span className={`px-2 py-1 rounded-full text-xs font-semibold ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span></td>
+                                                    <td className="p-4 text-gray-600 font-mono">{formatCurrency(item.price)}</td>
+                                                    <td className="p-4 text-right"><button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 p-2"><Icons.Trash2 className="w-5 h-5"/></button></td>
+                                                </tr>
+                                            ))}
+                                            {items.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No tienes publicaciones activas.</td></tr>}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </main>
+                    </div>
+                );
+            };
+
+            const ListingDetails = ({ item }) => {
+                const [showContactForm, setShowContactForm] = useState(false);
+                const [contactData, setContactData] = useState({ name: '', phone: '' });
+                const [sent, setSent] = useState(false);
+                const [activeImg, setActiveImg] = useState(item.coverIndex);
+
+                const handleContactSubmit = (e) => {
+                    e.preventDefault();
+                    setSent(true);
+                    setTimeout(() => {
+                        setSent(false); setShowContactForm(false); setContactData({name: '', phone: ''});
+                        alert(`¡Gracias ${contactData.name}! Te llamaremos al ${contactData.phone}.`);
+                    }, 1500);
+                };
+
+                return (
+                    <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+                        <div className="sticky top-0 bg-white/90 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-10">
+                            <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium"><Icons.X className="w-6 h-6"/> Cerrar</button>
+                            <button onClick={(e) => toggleFavorite(e, item.id)} className={`p-2 rounded-full transition ${favorites.includes(item.id) ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400'}`}>
+                                <Icons.Heart className="w-6 h-6" fill={favorites.includes(item.id)} />
+                            </button>
+                        </div>
+                        <div className="max-w-6xl mx-auto p-4 md:p-8 grid md:grid-cols-2 gap-8 lg:gap-12 pb-20">
+                            <div className="space-y-4">
+                                <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden bg-gray-100 shadow-lg"><img src={item.images[activeImg]} className="w-full h-full object-cover" /></div>
+                                <div className="flex gap-2 overflow-x-auto pb-2">{item.images.map((img, idx) => (
+                                    <button key={idx} onClick={() => setActiveImg(idx)} className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition ${activeImg === idx ? 'border-slate-900' : 'border-transparent opacity-60'}`}><img src={img} className="w-full h-full object-cover" /></button>
+                                ))}</div>
+                            </div>
+                            <div className="flex flex-col">
+                                <div className="mb-6">
+                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide mb-3 ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
+                                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">{item.title}</h1>
+                                    <p className="text-3xl font-light text-slate-700">{formatCurrency(item.price)}</p>
+                                </div>
+                                <div className="bg-slate-50 p-6 rounded-2xl mb-8"><h3 className="text-sm font-bold text-slate-500 uppercase mb-3">Descripción</h3><p className="text-gray-700 leading-relaxed whitespace-pre-line">{item.description}</p></div>
+                                <div className="mt-auto">
+                                    {!showContactForm ? (
+                                        <button onClick={() => setShowContactForm(true)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-xl flex items-center justify-center gap-3"><Icons.Calendar className="w-5 h-5"/> Quiero verlo</button>
+                                    ) : (
+                                        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xl animate-fade-in-up">
+                                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-slate-900">Agendar Visita Personal</h3><button onClick={() => setShowContactForm(false)} className="text-gray-400 hover:text-gray-600"><Icons.X className="w-5 h-5"/></button></div>
+                                            {sent ? (
+                                                <div className="text-center py-8 text-green-600"><div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3"><Icons.Check className="w-6 h-6"/></div><p className="font-bold">¡Solicitud Enviada!</p></div>
+                                            ) : (
+                                                <form onSubmit={handleContactSubmit} className="space-y-4">
+                                                    <div><label className="text-sm font-medium text-gray-700">Tu Nombre</label><input required type="text" value={contactData.name} onChange={(e) => setContactData({...contactData, name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
+                                                    <div><label className="text-sm font-medium text-gray-700">Teléfono</label><input required type="tel" value={contactData.phone} onChange={(e) => setContactData({...contactData, phone: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
+                                                    <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold">Confirmar Interés</button>
+                                                </form>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const HomeView = () => {
+                const filteredItems = items.filter(item => filter === 'all' || item.type === filter);
+                return (
+                    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+                        <nav className="bg-white shadow-sm sticky top-0 z-20">
+                            <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                                <div className="flex items-center gap-2">
+                                    <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white"><span className="font-bold text-xl">R</span></div>
+                                    <div className="leading-tight hidden sm:block"><h1 className="font-bold text-slate-900 text-lg">Vehículos y propiedades RR</h1><p className="text-xs text-gray-500 tracking-wider">Exclusivos al precio correcto</p></div>
+                                </div>
+                                <div className="flex gap-2">
+                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Todo</button>
+                                    <button onClick={() => setFilter('vehicle')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'vehicle' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Vehículos</button>
+                                    <button onClick={() => setFilter('property')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'property' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Propiedades</button>
+                                </div>
+                            </div>
+                        </nav>
+                        <div className="bg-slate-900 text-white py-12 md:py-20 px-4">
+                            <div className="max-w-4xl mx-auto text-center"><h2 className="text-3xl md:text-5xl font-bold mb-4">Encuentra tu próximo sueño</h2><p className="text-slate-300 text-lg">La mejor selección de vehículos y propiedades exclusivas en Guatemala.</p></div>
+                        </div>
+                        <main className="max-w-7xl mx-auto px-4 py-12 w-full flex-grow">
+                            {filteredItems.length === 0 ? (
+                                <div className="text-center py-20"><p className="text-gray-500 text-lg">No hay publicaciones en esta categoría por el momento.</p></div>
+                            ) : (
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                    {filteredItems.map((item) => (
+                                        <div key={item.id} onClick={() => { setSelectedItem(item); setView('details'); }} className="bg-white rounded-2xl shadow-sm hover:shadow-xl transition duration-300 overflow-hidden cursor-pointer group border border-gray-100">
+                                            <div className="relative h-64 overflow-hidden">
+                                                <img src={item.images[item.coverIndex]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                                                <div className="absolute top-3 left-3 bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-slate-800 shadow-sm">{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</div>
+                                                <button onClick={(e) => toggleFavorite(e, item.id)} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white transition shadow-sm">
+                                                    <Icons.Heart className={`w-5 h-5 ${favorites.includes(item.id) ? 'text-red-500' : 'text-slate-700'}`} fill={favorites.includes(item.id)}/>
+                                                </button>
+                                            </div>
+                                            <div className="p-6">
+                                                <div className="flex justify-between items-start mb-2"><h3 className="font-bold text-lg text-slate-900 line-clamp-1">{item.title}</h3></div>
+                                                <p className="text-2xl font-light text-slate-700 mb-4">{formatCurrency(item.price)}</p>
+                                                <p className="text-gray-500 text-sm line-clamp-2 mb-4">{item.description}</p>
+                                                <div className="flex items-center text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition">Ver detalles <span className="ml-1">→</span></div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </main>
+                        <footer className="bg-white border-t py-8 mt-12">
+                            <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                                <p className="text-gray-400 text-sm">© 2024 Vehículos y propiedades RR. Guatemala.</p>
+                                <button onClick={() => setView(isAdmin ? 'adminDashboard' : 'adminLogin')} className="flex items-center gap-2 text-gray-300 hover:text-slate-800 transition text-xs font-medium"><Icons.Lock className="w-3 h-3"/> Acceso Admin</button>
+                            </div>
+                        </footer>
+                    </div>
+                );
+            };
+
+            return view === 'adminLogin' ? <AdminLogin /> : view === 'adminDashboard' ? <AdminDashboard /> : view === 'create' ? <CreateListing /> : view === 'details' && selectedItem ? <ListingDetails item={selectedItem} /> : <HomeView />;
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
