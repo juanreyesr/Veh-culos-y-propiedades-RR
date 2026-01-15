@@ -27,7 +27,7 @@
     <script type="text/babel">
         const { useState, useEffect } = React;
 
-        // --- ICONOS SVG (Reemplazo de lucide-react para HTML standalone) ---
+        // --- ICONOS SVG ---
         const Icon = ({ path, className, fill = "none" }) => (
             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill={fill} stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}>
                 {path}
@@ -47,8 +47,7 @@
             Calendar: (props) => <Icon {...props} path={<><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" x2="16" y1="2" y2="6"/><line x1="8" x2="8" y1="2" y2="6"/><line x1="3" x2="21" y1="10" y2="10"/></>} />,
             LogOut: (props) => <Icon {...props} path={<><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" x2="9" y1="12" y2="12"/></>} />,
             Camera: (props) => <Icon {...props} path={<><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></>} />,
-            Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />,
-            FileText: (props) => <Icon {...props} path={<><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></>} />
+            Edit: (props) => <Icon {...props} path={<><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></>} />
         };
 
         // --- Datos Iniciales ---
@@ -65,7 +64,7 @@
                 ],
                 coverIndex: 0,
                 isFavorite: false,
-                status: 'active', // active, sold
+                status: 'active',
                 soldDate: null
             },
             {
@@ -85,10 +84,439 @@
             }
         ];
 
-        // --- Componente Principal ---
+        // --- SUB-COMPONENTES (Definidos FUERA de App para evitar bugs de teclado) ---
+
+        const AdminLogin = ({ email, setEmail, pass, setPass, onLogin, error, onBack }) => (
+            <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
+                <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
+                    <div className="text-center mb-6">
+                        <div className="w-12 h-12 mx-auto mb-2 text-slate-800 flex justify-center"><Icons.Lock /></div>
+                        <h2 className="text-2xl font-bold text-slate-800">Administración</h2>
+                        <p className="text-gray-500 text-sm">Ingreso exclusivo para personal autorizado</p>
+                    </div>
+                    <form onSubmit={onLogin} className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
+                            <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
+                                placeholder="juanr502@yahoo.es" />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
+                            <input type="password" value={pass} onChange={(e) => setPass(e.target.value)}
+                                className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
+                                placeholder="••••••••" />
+                        </div>
+                        {error && <p className="text-red-500 text-sm text-center">{error}</p>}
+                        <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition">Ingresar</button>
+                        <button onClick={onBack} type="button" className="w-full py-2 text-slate-600 text-sm hover:underline">Volver a la tienda</button>
+                    </form>
+                </div>
+            </div>
+        );
+
+        const ListingForm = ({ isEdit, itemToEdit, items, setItems, setView }) => {
+            const [formData, setFormData] = useState(isEdit && itemToEdit ? itemToEdit : {
+                type: 'vehicle', title: '', price: '', description: '', images: [], coverIndex: 0, status: 'active'
+            });
+            const [isUploading, setIsUploading] = useState(false);
+
+            const handleFileSelect = (e) => {
+                if (e.target.files && e.target.files.length > 0) {
+                    setIsUploading(true);
+                    const files = Array.from(e.target.files);
+                    const readers = files.map(file => new Promise((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onloadend = () => resolve(reader.result);
+                        reader.onerror = reject;
+                        reader.readAsDataURL(file);
+                    }));
+
+                    Promise.all(readers).then(newImages => {
+                        setFormData(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
+                        setIsUploading(false);
+                    }).catch(err => {
+                        console.error("Error", err);
+                        setIsUploading(false);
+                        alert("Error al cargar imágenes.");
+                    });
+                }
+            };
+
+            const handleRemoveImage = (index) => {
+                const updated = formData.images.filter((_, i) => i !== index);
+                setFormData({ ...formData, images: updated, coverIndex: formData.coverIndex >= updated.length ? 0 : formData.coverIndex });
+            };
+
+            const handleSubmit = (e) => {
+                e.preventDefault();
+                if (!formData.title || !formData.price || !formData.description) return alert("Llena todos los campos.");
+                if (formData.images.length === 0) return alert("Sube al menos una foto.");
+                
+                if (isEdit) {
+                    const updatedItems = items.map(item => {
+                        if (item.id === formData.id) {
+                            return {
+                                ...formData,
+                                price: parseFloat(formData.price),
+                                soldDate: formData.status === 'sold' && item.status !== 'sold' ? Date.now() : (formData.status === 'active' ? null : item.soldDate)
+                            };
+                        }
+                        return item;
+                    });
+                    setItems(updatedItems);
+                } else {
+                    setItems([{ 
+                        ...formData, 
+                        id: Date.now(), 
+                        price: parseFloat(formData.price), 
+                        isFavorite: false,
+                        status: 'active',
+                        soldDate: null 
+                    }, ...items]);
+                }
+                setView('adminDashboard');
+            };
+
+            return (
+                <div className="min-h-screen bg-gray-50 pb-20">
+                    <header className="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center">
+                        <h2 className="text-lg font-bold flex items-center gap-2">
+                            {isEdit ? <Icons.Edit className="w-5 h-5"/> : <Icons.Plus className="w-5 h-5"/>} 
+                            {isEdit ? 'Editar Anuncio' : 'Nuevo Anuncio'}
+                        </h2>
+                        <button onClick={() => setView('adminDashboard')} className="text-sm bg-slate-700 px-3 py-1 rounded hover:bg-slate-600">Cancelar</button>
+                    </header>
+                    <main className="max-w-2xl mx-auto p-4 md:p-8">
+                        <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-6">
+                            {isEdit && (
+                                <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-4">
+                                    <label className="flex items-center gap-3 cursor-pointer">
+                                        <input type="checkbox" checked={formData.status === 'sold'} onChange={(e) => setFormData({...formData, status: e.target.checked ? 'sold' : 'active'})} className="w-5 h-5 accent-red-600"/>
+                                        <div><span className="font-bold text-gray-800">Marcar como VENDIDO</span><p className="text-xs text-gray-600">Se borrará automáticamente en 15 días.</p></div>
+                                    </label>
+                                </div>
+                            )}
+                            <div>
+                                <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
+                                <div className="flex gap-4">
+                                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${formData.type === 'vehicle' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
+                                        <input type="radio" name="type" className="hidden" checked={formData.type === 'vehicle'} onChange={() => setFormData({...formData, type: 'vehicle'})} />
+                                        <Icons.Car className="w-5 h-5"/> Vehículo
+                                    </label>
+                                    <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${formData.type === 'property' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
+                                        <input type="radio" name="type" className="hidden" checked={formData.type === 'property'} onChange={() => setFormData({...formData, type: 'property'})} />
+                                        <Icons.Home className="w-5 h-5"/> Propiedad
+                                    </label>
+                                </div>
+                            </div>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Título</label><input type="text" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Ej. Honda Civic 2020"/></div>
+                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio (Q)</label><input type="number" required value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="0.00"/></div>
+                            </div>
+                            <div><label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label><textarea required rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Detalles..."></textarea></div>
+                            <div>
+                                <div className="flex justify-between items-center mb-2"><label className="block text-sm font-medium text-gray-700">Fotos</label><span className="text-xs text-gray-500">{formData.images.length} fotos</span></div>
+                                <div className="mb-4">
+                                    <label className="w-full flex flex-col items-center px-4 py-6 bg-white text-slate-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue cursor-pointer hover:bg-slate-50 hover:text-slate-800 transition border-dashed border-2 border-slate-300">
+                                        <Icons.Camera className="w-8 h-8"/> <span className="mt-2 text-sm">Seleccionar fotos</span>
+                                        <input type='file' multiple accept="image/*" className="hidden" onChange={handleFileSelect} />
+                                    </label>
+                                    {isUploading && <p className="text-center text-xs text-blue-600 mt-2">Procesando...</p>}
+                                </div>
+                                {formData.images.length > 0 && (
+                                    <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                                        {formData.images.map((img, idx) => (
+                                            <div key={idx} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${formData.coverIndex === idx ? 'border-slate-900 ring-2 ring-slate-900' : 'border-gray-200'}`}>
+                                                <img src={img} className="w-full h-full object-cover" />
+                                                <input type="radio" name="cover" checked={formData.coverIndex === idx} onChange={() => setFormData({...formData, coverIndex: idx})} className="absolute top-2 left-2 w-4 h-4 cursor-pointer accent-slate-900"/>
+                                                <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 hover:text-red-700"><Icons.Trash2 className="w-3 h-3"/></button>
+                                                {formData.coverIndex === idx && <div className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[10px] text-center py-1">Portada</div>}
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button type="submit" disabled={isUploading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-lg mt-4 disabled:opacity-50">{isEdit ? 'Guardar Cambios' : 'Publicar'}</button>
+                        </form>
+                    </main>
+                </div>
+            );
+        };
+
+        const AdminDashboard = ({ items, setItems, leads, setLeads, setView, setIsAdmin, formatCurrency, onEditItem }) => {
+            const [tab, setTab] = useState('listings');
+
+            const handleDeleteItem = (id) => {
+                if (confirm('¿Eliminar anuncio permanentemente?')) setItems(items.filter(item => item.id !== id));
+            };
+
+            const handleToggleLead = (id) => {
+                const updatedLeads = leads.map(lead => {
+                    if (lead.id === id) {
+                        return { ...lead, status: lead.status === 'attended' ? 'pending' : 'attended' };
+                    }
+                    return lead;
+                });
+                setLeads(updatedLeads);
+            };
+
+            const handleDeleteLead = (id) => {
+                if(confirm('¿Eliminar esta solicitud del registro?')) {
+                    setLeads(leads.filter(lead => lead.id !== id));
+                }
+            };
+
+            // Ordenar leads: Pendientes primero, luego atendidos
+            const sortedLeads = [...leads].sort((a, b) => {
+                if (a.status === 'attended' && b.status !== 'attended') return 1;
+                if (a.status !== 'attended' && b.status === 'attended') return -1;
+                return b.date - a.date;
+            });
+
+            return (
+                <div className="min-h-screen bg-gray-50">
+                    <header className="bg-white border-b sticky top-0 z-10">
+                        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                            <h1 className="text-xl font-bold text-slate-900">Panel de Control</h1>
+                            <div className="flex gap-4 items-center">
+                                <span className="text-sm text-gray-500 hidden md:block">Hola, Juan José</span>
+                                <button onClick={() => { setIsAdmin(false); setView('home'); }} className="flex items-center gap-2 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition"><Icons.LogOut className="w-4 h-4"/> Salir</button>
+                            </div>
+                        </div>
+                    </header>
+                    <main className="max-w-7xl mx-auto px-4 py-8">
+                        
+                        <div className="flex gap-4 mb-8 border-b">
+                            <button onClick={() => setTab('listings')} className={`pb-2 px-4 font-medium transition ${tab === 'listings' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                                Publicaciones ({items.length})
+                            </button>
+                            <button onClick={() => setTab('leads')} className={`pb-2 px-4 font-medium transition ${tab === 'leads' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-500 hover:text-gray-700'}`}>
+                                Solicitudes ({leads.length})
+                            </button>
+                        </div>
+
+                        {tab === 'listings' ? (
+                            <>
+                                <div className="flex justify-end mb-4">
+                                    <button onClick={() => setView('create')} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"><Icons.Plus className="w-5 h-5"/> Nueva Publicación</button>
+                                </div>
+                                <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                                    <div className="overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-slate-50 text-slate-600 text-sm uppercase"><tr><th className="p-4">Anuncio</th><th className="p-4">Estado</th><th className="p-4">Precio</th><th className="p-4 text-right">Acciones</th></tr></thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {items.map(item => (
+                                                    <tr key={item.id} className="hover:bg-slate-50 transition">
+                                                        <td className="p-4"><div className="flex items-center gap-3"><img src={item.images[item.coverIndex]} className="w-12 h-12 rounded object-cover bg-gray-200" /><span className="font-medium text-gray-900">{item.title}</span></div></td>
+                                                        <td className="p-4">
+                                                            <span className={`px-2 py-1 rounded-full text-xs font-semibold mr-2 ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
+                                                            {item.status === 'sold' && <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">VENDIDO</span>}
+                                                        </td>
+                                                        <td className="p-4 text-gray-600 font-mono">{formatCurrency(item.price)}</td>
+                                                        <td className="p-4 text-right flex justify-end gap-2">
+                                                            <button onClick={() => onEditItem(item)} className="text-blue-600 hover:text-blue-800 p-2 bg-blue-50 rounded"><Icons.Edit className="w-4 h-4"/></button>
+                                                            <button onClick={() => handleDeleteItem(item.id)} className="text-red-500 hover:text-red-700 p-2 bg-red-50 rounded"><Icons.Trash2 className="w-4 h-4"/></button>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {items.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No tienes publicaciones activas.</td></tr>}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
+                                <table className="w-full text-left">
+                                    <thead className="bg-slate-50 text-slate-600 text-sm uppercase"><tr><th className="p-4">Estado</th><th className="p-4">Fecha</th><th className="p-4">Cliente</th><th className="p-4">Teléfono</th><th className="p-4">Interés</th><th className="p-4">Acción</th></tr></thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {sortedLeads.length > 0 ? sortedLeads.map((lead) => (
+                                            <tr key={lead.id} className={`hover:bg-slate-50 transition ${lead.status === 'attended' ? 'bg-gray-50 opacity-60' : ''}`}>
+                                                <td className="p-4">
+                                                    <button onClick={() => handleToggleLead(lead.id)} className={`flex items-center gap-1 text-xs font-bold px-2 py-1 rounded border ${lead.status === 'attended' ? 'bg-green-100 text-green-700 border-green-200' : 'bg-yellow-50 text-yellow-700 border-yellow-200'}`}>
+                                                        {lead.status === 'attended' ? <Icons.Check className="w-3 h-3"/> : <div className="w-3 h-3 rounded-full bg-yellow-400"></div>}
+                                                        {lead.status === 'attended' ? 'Atendido' : 'Nuevo'}
+                                                    </button>
+                                                </td>
+                                                <td className="p-4 text-sm text-gray-500">{new Date(lead.date).toLocaleDateString()}</td>
+                                                <td className="p-4 font-medium">{lead.name}</td>
+                                                <td className="p-4 font-mono text-blue-600">{lead.phone}</td>
+                                                <td className="p-4 text-sm text-gray-600">{lead.itemTitle} (ID: {lead.itemId})</td>
+                                                <td className="p-4">
+                                                    <button onClick={() => handleDeleteLead(lead.id)} className="text-red-400 hover:text-red-600 p-2"><Icons.Trash2 className="w-4 h-4"/></button>
+                                                </td>
+                                            </tr>
+                                        )) : (
+                                            <tr><td colSpan="6" className="p-8 text-center text-gray-500">No hay solicitudes de visita aún.</td></tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        };
+
+        const ListingDetails = ({ item, setView, favorites, toggleFavorite, leads, setLeads, formatCurrency }) => {
+            const [showContactForm, setShowContactForm] = useState(false);
+            const [contactData, setContactData] = useState({ name: '', phone: '' });
+            const [sent, setSent] = useState(false);
+            const [activeImg, setActiveImg] = useState(item.coverIndex);
+
+            const handleContactSubmit = (e) => {
+                e.preventDefault();
+                const newLead = {
+                    id: Date.now(),
+                    date: Date.now(),
+                    name: contactData.name,
+                    phone: contactData.phone,
+                    itemId: item.id,
+                    itemTitle: item.title,
+                    status: 'pending' // pending, attended
+                };
+                setLeads([newLead, ...leads]);
+
+                setSent(true);
+                setTimeout(() => {
+                    setSent(false); setShowContactForm(false); setContactData({name: '', phone: ''});
+                    alert(`¡Gracias ${contactData.name}! Tu solicitud ha sido registrada correctamente en nuestro sistema.`);
+                }, 2000);
+            };
+
+            return (
+                <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+                    <div className="sticky top-0 bg-white/90 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-10">
+                        <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium"><Icons.X className="w-6 h-6"/> Cerrar</button>
+                        <button onClick={(e) => toggleFavorite(e, item.id)} className={`p-2 rounded-full transition ${favorites.includes(item.id) ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400'}`}>
+                            <Icons.Heart className="w-6 h-6" fill={favorites.includes(item.id)} />
+                        </button>
+                    </div>
+                    <div className="max-w-6xl mx-auto p-4 md:p-8 grid md:grid-cols-2 gap-8 lg:gap-12 pb-20">
+                        <div className="space-y-4">
+                            <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden bg-gray-100 shadow-lg relative">
+                                <img src={item.images[activeImg]} className="w-full h-full object-cover" />
+                                {item.status === 'sold' && (
+                                    <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                                        <span className="border-4 border-red-500 text-red-500 font-black text-5xl uppercase px-6 py-2 transform -rotate-12 tracking-widest bg-white/10 backdrop-blur-sm">VENDIDO</span>
+                                    </div>
+                                )}
+                            </div>
+                            <div className="flex gap-2 overflow-x-auto pb-2">{item.images.map((img, idx) => (
+                                <button key={idx} onClick={() => setActiveImg(idx)} className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition ${activeImg === idx ? 'border-slate-900' : 'border-transparent opacity-60'}`}><img src={img} className="w-full h-full object-cover" /></button>
+                            ))}</div>
+                        </div>
+                        <div className="flex flex-col">
+                            <div className="mb-6">
+                                <div className="flex gap-2 mb-3">
+                                    <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
+                                    {item.status === 'sold' && <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-600 text-white">VENDIDO</span>}
+                                </div>
+                                <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">{item.title}</h1>
+                                <p className="text-3xl font-light text-slate-700">{formatCurrency(item.price)}</p>
+                            </div>
+                            <div className="bg-slate-50 p-6 rounded-2xl mb-8"><h3 className="text-sm font-bold text-slate-500 uppercase mb-3">Descripción</h3><p className="text-gray-700 leading-relaxed whitespace-pre-line">{item.description}</p></div>
+                            <div className="mt-auto">
+                                {item.status === 'sold' ? (
+                                    <button disabled className="w-full bg-gray-300 text-gray-500 py-4 rounded-xl font-bold text-lg cursor-not-allowed">No Disponible</button>
+                                ) : !showContactForm ? (
+                                    <button onClick={() => setShowContactForm(true)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-xl flex items-center justify-center gap-3"><Icons.Calendar className="w-5 h-5"/> Quiero verlo</button>
+                                ) : (
+                                    <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xl animate-fade-in-up">
+                                        <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-slate-900">Agendar Visita Personal</h3><button onClick={() => setShowContactForm(false)} className="text-gray-400 hover:text-gray-600"><Icons.X className="w-5 h-5"/></button></div>
+                                        {sent ? (
+                                            <div className="text-center py-8 text-green-600"><div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3"><Icons.Check className="w-6 h-6"/></div><p className="font-bold">¡Solicitud Registrada!</p></div>
+                                        ) : (
+                                            <form onSubmit={handleContactSubmit} className="space-y-4">
+                                                <div><label className="text-sm font-medium text-gray-700">Tu Nombre</label><input required type="text" value={contactData.name} onChange={(e) => setContactData({...contactData, name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
+                                                <div><label className="text-sm font-medium text-gray-700">Teléfono</label><input required type="tel" value={contactData.phone} onChange={(e) => setContactData({...contactData, phone: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
+                                                <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold">Enviar Solicitud</button>
+                                            </form>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+        };
+
+        const HomeView = ({ items, filter, setFilter, favorites, toggleFavorite, setSelectedItem, setView, isAdmin, formatCurrency }) => {
+            const filteredItems = items
+                .filter(item => filter === 'all' || item.type === filter)
+                .sort((a, b) => {
+                    if (a.status === 'sold' && b.status !== 'sold') return 1;
+                    if (a.status !== 'sold' && b.status === 'sold') return -1;
+                    return b.id - a.id; 
+                });
+
+            return (
+                <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
+                    <nav className="bg-white shadow-sm sticky top-0 z-20">
+                        <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
+                            <div className="flex items-center gap-2">
+                                <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white"><span className="font-bold text-xl">R</span></div>
+                                <div className="leading-tight hidden sm:block"><h1 className="font-bold text-slate-900 text-lg">Vehículos y propiedades RR</h1><p className="text-xs text-gray-500 tracking-wider">Exclusivos al precio correcto</p></div>
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Todo</button>
+                                <button onClick={() => setFilter('vehicle')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'vehicle' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Vehículos</button>
+                                <button onClick={() => setFilter('property')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'property' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Propiedades</button>
+                            </div>
+                        </div>
+                    </nav>
+                    <div className="bg-slate-900 text-white py-12 md:py-20 px-4">
+                        <div className="max-w-4xl mx-auto text-center"><h2 className="text-3xl md:text-5xl font-bold mb-4">Encuentra tu próximo sueño</h2><p className="text-slate-300 text-lg">La mejor selección de vehículos y propiedades exclusivas en Guatemala.</p></div>
+                    </div>
+                    <main className="max-w-7xl mx-auto px-4 py-12 w-full flex-grow">
+                        {filteredItems.length === 0 ? (
+                            <div className="text-center py-20"><p className="text-gray-500 text-lg">No hay publicaciones en esta categoría por el momento.</p></div>
+                        ) : (
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+                                {filteredItems.map((item) => (
+                                    <div key={item.id} onClick={() => { setSelectedItem(item); setView('details'); }} className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition duration-300 overflow-hidden cursor-pointer group border border-gray-100 ${item.status === 'sold' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
+                                        <div className="relative h-64 overflow-hidden">
+                                            <img src={item.images[item.coverIndex]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
+                                            <div className="absolute top-3 left-3 flex gap-2">
+                                                <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-slate-800 shadow-sm">{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
+                                                {item.status === 'sold' && <span className="bg-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white shadow-sm">VENDIDO</span>}
+                                            </div>
+                                            <button onClick={(e) => toggleFavorite(e, item.id)} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white transition shadow-sm">
+                                                <Icons.Heart className={`w-5 h-5 ${favorites.includes(item.id) ? 'text-red-500' : 'text-slate-700'}`} fill={favorites.includes(item.id)}/>
+                                            </button>
+                                            {item.status === 'sold' && (
+                                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                                    <div className="bg-red-600/90 text-white font-bold text-xl px-6 py-2 transform -rotate-6 shadow-lg border-2 border-white">VENDIDO</div>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="p-6">
+                                            <div className="flex justify-between items-start mb-2"><h3 className="font-bold text-lg text-slate-900 line-clamp-1">{item.title}</h3></div>
+                                            <p className="text-2xl font-light text-slate-700 mb-4">{formatCurrency(item.price)}</p>
+                                            <p className="text-gray-500 text-sm line-clamp-2 mb-4">{item.description}</p>
+                                            <div className="flex items-center text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition">Ver detalles <span className="ml-1">→</span></div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </main>
+                    <footer className="bg-white border-t py-8 mt-12">
+                        <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <p className="text-gray-400 text-sm">© 2024 Vehículos y propiedades RR. Guatemala.</p>
+                            <button onClick={() => setView(isAdmin ? 'adminDashboard' : 'adminLogin')} className="flex items-center gap-2 text-gray-300 hover:text-slate-800 transition text-xs font-medium"><Icons.Lock className="w-3 h-3"/> Acceso Admin</button>
+                        </div>
+                    </footer>
+                </div>
+            );
+        };
+
+        // --- Componente Principal APP ---
         function App() {
             // Estado Global
-            const [view, setView] = useState('home'); // home, details, adminLogin, adminDashboard, create, edit
+            const [view, setView] = useState('home'); 
             
             // Items
             const [items, setItems] = useState(() => {
@@ -104,7 +532,7 @@
 
             const [favorites, setFavorites] = useState([]);
             const [selectedItem, setSelectedItem] = useState(null);
-            const [filter, setFilter] = useState('all'); // all, vehicle, property
+            const [filter, setFilter] = useState('all'); 
             
             // Estado Admin
             const [isAdmin, setIsAdmin] = useState(false);
@@ -113,28 +541,20 @@
             const [loginError, setLoginError] = useState('');
             const [itemToEdit, setItemToEdit] = useState(null);
 
-            // Persistencia y Limpieza Automática
+            // Persistencia
             useEffect(() => {
-                // Limpiar vendidos de más de 15 días
                 const now = Date.now();
                 const fifteenDaysMs = 15 * 24 * 60 * 60 * 1000;
-                
                 const cleanItems = items.filter(item => {
                     if (item.status === 'sold' && item.soldDate) {
                         return (now - item.soldDate) < fifteenDaysMs;
                     }
                     return true;
                 });
-
-                // Si hubo limpieza, actualizar estado, si no, solo guardar
                 if (cleanItems.length !== items.length) {
                     setItems(cleanItems);
                 } else {
-                    try {
-                        localStorage.setItem('catalog_items', JSON.stringify(items));
-                    } catch (e) {
-                        console.error("Storage full", e);
-                    }
+                    try { localStorage.setItem('catalog_items', JSON.stringify(items)); } catch (e) { console.error(e); }
                 }
             }, [items]);
 
@@ -142,453 +562,45 @@
                 localStorage.setItem('catalog_leads', JSON.stringify(leads));
             }, [leads]);
 
-            const formatCurrency = (amount) => {
-                return new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(amount);
-            };
+            const formatCurrency = (amount) => new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(amount);
 
             const toggleFavorite = (e, id) => {
                 e.stopPropagation();
-                if (favorites.includes(id)) {
-                    setFavorites(favorites.filter(favId => favId !== id));
+                if (favorites.includes(id)) setFavorites(favorites.filter(favId => favId !== id));
+                else setFavorites([...favorites, id]);
+            };
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (loginEmail === 'juanr502@yahoo.es' && loginPass === 'juanjose') {
+                    setIsAdmin(true); setView('adminDashboard'); setLoginError('');
                 } else {
-                    setFavorites([...favorites, id]);
+                    setLoginError('Credenciales incorrectas');
                 }
             };
 
-            // --- Vistas ---
-
-            const AdminLogin = () => {
-                const handleLogin = (e) => {
-                    e.preventDefault();
-                    if (loginEmail === 'juanr502@yahoo.es' && loginPass === 'juanjose') {
-                        setIsAdmin(true);
-                        setView('adminDashboard');
-                        setLoginError('');
-                    } else {
-                        setLoginError('Credenciales incorrectas');
-                    }
-                };
-
-                return (
-                    <div className="min-h-screen flex items-center justify-center bg-gray-100 px-4">
-                        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-                            <div className="text-center mb-6">
-                                <div className="w-12 h-12 mx-auto mb-2 text-slate-800 flex justify-center"><Icons.Lock /></div>
-                                <h2 className="text-2xl font-bold text-slate-800">Administración</h2>
-                                <p className="text-gray-500 text-sm">Ingreso exclusivo para personal autorizado</p>
-                            </div>
-                            <form onSubmit={handleLogin} className="space-y-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Correo Electrónico</label>
-                                    <input type="email" value={loginEmail} onChange={(e) => setLoginEmail(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
-                                        placeholder="juanr502@yahoo.es" />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Contraseña</label>
-                                    <input type="password" value={loginPass} onChange={(e) => setLoginPass(e.target.value)}
-                                        className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-slate-800 focus:outline-none"
-                                        placeholder="••••••••" />
-                                </div>
-                                {loginError && <p className="text-red-500 text-sm text-center">{loginError}</p>}
-                                <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-semibold hover:bg-slate-800 transition">Ingresar</button>
-                                <button onClick={() => setView('home')} type="button" className="w-full py-2 text-slate-600 text-sm hover:underline">Volver a la tienda</button>
-                            </form>
-                        </div>
-                    </div>
-                );
+            const handleEditItem = (item) => {
+                setItemToEdit(item);
+                setView('edit');
             };
 
-            const ListingForm = ({ isEdit = false }) => {
-                const [formData, setFormData] = useState(isEdit && itemToEdit ? itemToEdit : {
-                    type: 'vehicle', title: '', price: '', description: '', images: [], coverIndex: 0, status: 'active'
-                });
-                const [isUploading, setIsUploading] = useState(false);
-
-                const handleFileSelect = (e) => {
-                    if (e.target.files && e.target.files.length > 0) {
-                        setIsUploading(true);
-                        const files = Array.from(e.target.files);
-                        const readers = files.map(file => new Promise((resolve, reject) => {
-                            const reader = new FileReader();
-                            reader.onloadend = () => resolve(reader.result);
-                            reader.onerror = reject;
-                            reader.readAsDataURL(file);
-                        }));
-
-                        Promise.all(readers).then(newImages => {
-                            setFormData(prev => ({ ...prev, images: [...prev.images, ...newImages] }));
-                            setIsUploading(false);
-                        }).catch(err => {
-                            console.error("Error", err);
-                            setIsUploading(false);
-                            alert("Error al cargar imágenes.");
-                        });
-                    }
-                };
-
-                const handleRemoveImage = (index) => {
-                    const updated = formData.images.filter((_, i) => i !== index);
-                    setFormData({ ...formData, images: updated, coverIndex: formData.coverIndex >= updated.length ? 0 : formData.coverIndex });
-                };
-
-                const handleSubmit = (e) => {
-                    e.preventDefault();
-                    if (!formData.title || !formData.price || !formData.description) return alert("Llena todos los campos.");
-                    if (formData.images.length === 0) return alert("Sube al menos una foto.");
-                    
-                    if (isEdit) {
-                        // Actualizar existente
-                        const updatedItems = items.map(item => {
-                            if (item.id === formData.id) {
-                                return {
-                                    ...formData,
-                                    price: parseFloat(formData.price),
-                                    // Si cambia a vendido, guardar fecha, si no, borrar fecha
-                                    soldDate: formData.status === 'sold' && item.status !== 'sold' ? Date.now() : (formData.status === 'active' ? null : item.soldDate)
-                                };
-                            }
-                            return item;
-                        });
-                        setItems(updatedItems);
-                    } else {
-                        // Crear nuevo
-                        setItems([{ 
-                            ...formData, 
-                            id: Date.now(), 
-                            price: parseFloat(formData.price), 
-                            isFavorite: false,
-                            status: 'active',
-                            soldDate: null 
-                        }, ...items]);
-                    }
-                    setView('adminDashboard');
-                };
-
-                return (
-                    <div className="min-h-screen bg-gray-50 pb-20">
-                        <header className="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-10 flex justify-between items-center">
-                            <h2 className="text-lg font-bold flex items-center gap-2">
-                                {isEdit ? <Icons.Edit className="w-5 h-5"/> : <Icons.Plus className="w-5 h-5"/>} 
-                                {isEdit ? 'Editar Anuncio' : 'Nuevo Anuncio'}
-                            </h2>
-                            <button onClick={() => setView('adminDashboard')} className="text-sm bg-slate-700 px-3 py-1 rounded hover:bg-slate-600">Cancelar</button>
-                        </header>
-                        <main className="max-w-2xl mx-auto p-4 md:p-8">
-                            <form onSubmit={handleSubmit} className="bg-white rounded-xl shadow-sm p-6 space-y-6">
-                                
-                                {isEdit && (
-                                    <div className="bg-yellow-50 border border-yellow-200 p-4 rounded-lg mb-4">
-                                        <label className="flex items-center gap-3 cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                checked={formData.status === 'sold'} 
-                                                onChange={(e) => setFormData({...formData, status: e.target.checked ? 'sold' : 'active'})}
-                                                className="w-5 h-5 accent-red-600"
-                                            />
-                                            <div>
-                                                <span className="font-bold text-gray-800">Marcar como VENDIDO</span>
-                                                <p className="text-xs text-gray-600">El anuncio aparecerá al final con etiqueta de "Vendido" y se borrará automáticamente en 15 días.</p>
-                                            </div>
-                                        </label>
-                                    </div>
-                                )}
-
-                                <div>
-                                    <label className="block text-sm font-semibold text-gray-700 mb-2">Tipo</label>
-                                    <div className="flex gap-4">
-                                        <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${formData.type === 'vehicle' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
-                                            <input type="radio" name="type" className="hidden" checked={formData.type === 'vehicle'} onChange={() => setFormData({...formData, type: 'vehicle'})} />
-                                            <Icons.Car className="w-5 h-5"/> Vehículo
-                                        </label>
-                                        <label className={`flex-1 cursor-pointer border-2 rounded-lg p-3 flex items-center justify-center gap-2 transition ${formData.type === 'property' ? 'border-slate-900 bg-slate-50 text-slate-900' : 'border-gray-200 text-gray-500'}`}>
-                                            <input type="radio" name="type" className="hidden" checked={formData.type === 'property'} onChange={() => setFormData({...formData, type: 'property'})} />
-                                            <Icons.Home className="w-5 h-5"/> Propiedad
-                                        </label>
-                                    </div>
-                                </div>
-                                <div className="grid md:grid-cols-2 gap-4">
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Título</label><input type="text" required value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Ej. Honda Civic 2020"/></div>
-                                    <div><label className="block text-sm font-medium text-gray-700 mb-1">Precio (Q)</label><input type="number" required value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="0.00"/></div>
-                                </div>
-                                <div><label className="block text-sm font-medium text-gray-700 mb-1">Descripción</label><textarea required rows={4} value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})} className="w-full p-2 border border-gray-300 rounded focus:ring-1 focus:ring-slate-900 focus:outline-none" placeholder="Detalles..."></textarea></div>
-                                <div>
-                                    <div className="flex justify-between items-center mb-2"><label className="block text-sm font-medium text-gray-700">Fotos</label><span className="text-xs text-gray-500">{formData.images.length} fotos</span></div>
-                                    <div className="mb-4">
-                                        <label className="w-full flex flex-col items-center px-4 py-6 bg-white text-slate-500 rounded-lg shadow-sm tracking-wide uppercase border border-blue cursor-pointer hover:bg-slate-50 hover:text-slate-800 transition border-dashed border-2 border-slate-300">
-                                            <Icons.Camera className="w-8 h-8"/> <span className="mt-2 text-sm">Seleccionar fotos</span>
-                                            <input type='file' multiple accept="image/*" className="hidden" onChange={handleFileSelect} />
-                                        </label>
-                                        {isUploading && <p className="text-center text-xs text-blue-600 mt-2">Procesando...</p>}
-                                    </div>
-                                    {formData.images.length > 0 && (
-                                        <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
-                                            {formData.images.map((img, idx) => (
-                                                <div key={idx} className={`relative aspect-square rounded-lg overflow-hidden border-2 ${formData.coverIndex === idx ? 'border-slate-900 ring-2 ring-slate-900' : 'border-gray-200'}`}>
-                                                    <img src={img} className="w-full h-full object-cover" />
-                                                    <input type="radio" name="cover" checked={formData.coverIndex === idx} onChange={() => setFormData({...formData, coverIndex: idx})} className="absolute top-2 left-2 w-4 h-4 cursor-pointer accent-slate-900"/>
-                                                    <button type="button" onClick={() => handleRemoveImage(idx)} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-red-500 hover:text-red-700"><Icons.Trash2 className="w-3 h-3"/></button>
-                                                    {formData.coverIndex === idx && <div className="absolute bottom-0 inset-x-0 bg-slate-900/80 text-white text-[10px] text-center py-1">Portada</div>}
-                                                </div>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <button type="submit" disabled={isUploading} className="w-full bg-slate-900 text-white py-3 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-lg mt-4 disabled:opacity-50">{isEdit ? 'Guardar Cambios' : 'Publicar'}</button>
-                            </form>
-                        </main>
-                    </div>
-                );
-            };
-
-            const AdminDashboard = () => {
-                const [tab, setTab] = useState('listings'); // listings, leads
-
-                const handleDelete = (id) => {
-                    if (confirm('¿Eliminar anuncio permanentemente?')) setItems(items.filter(item => item.id !== id));
-                };
-
-                const handleEdit = (item) => {
-                    setItemToEdit(item);
-                    setView('edit');
-                };
-
-                return (
-                    <div className="min-h-screen bg-gray-50">
-                        <header className="bg-white border-b sticky top-0 z-10">
-                            <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-                                <h1 className="text-xl font-bold text-slate-900">Panel de Control</h1>
-                                <div className="flex gap-4 items-center">
-                                    <span className="text-sm text-gray-500 hidden md:block">Hola, Juan José</span>
-                                    <button onClick={() => { setIsAdmin(false); setView('home'); }} className="flex items-center gap-2 text-sm text-red-600 hover:bg-red-50 px-3 py-2 rounded-lg transition"><Icons.LogOut className="w-4 h-4"/> Salir</button>
-                                </div>
-                            </div>
-                        </header>
-                        <main className="max-w-7xl mx-auto px-4 py-8">
-                            
-                            <div className="flex gap-4 mb-8 border-b">
-                                <button onClick={() => setTab('listings')} className={`pb-2 px-4 font-medium transition ${tab === 'listings' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    Publicaciones ({items.length})
-                                </button>
-                                <button onClick={() => setTab('leads')} className={`pb-2 px-4 font-medium transition ${tab === 'leads' ? 'text-slate-900 border-b-2 border-slate-900' : 'text-gray-500 hover:text-gray-700'}`}>
-                                    Solicitudes ({leads.length})
-                                </button>
-                            </div>
-
-                            {tab === 'listings' ? (
-                                <>
-                                    <div className="flex justify-end mb-4">
-                                        <button onClick={() => setView('create')} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2 rounded-lg flex items-center gap-2 transition shadow-lg"><Icons.Plus className="w-5 h-5"/> Nueva Publicación</button>
-                                    </div>
-                                    <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-left">
-                                                <thead className="bg-slate-50 text-slate-600 text-sm uppercase"><tr><th className="p-4">Anuncio</th><th className="p-4">Estado</th><th className="p-4">Precio</th><th className="p-4 text-right">Acciones</th></tr></thead>
-                                                <tbody className="divide-y divide-gray-100">
-                                                    {items.map(item => (
-                                                        <tr key={item.id} className="hover:bg-slate-50 transition">
-                                                            <td className="p-4"><div className="flex items-center gap-3"><img src={item.images[item.coverIndex]} className="w-12 h-12 rounded object-cover bg-gray-200" /><span className="font-medium text-gray-900">{item.title}</span></div></td>
-                                                            <td className="p-4">
-                                                                <span className={`px-2 py-1 rounded-full text-xs font-semibold mr-2 ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-700' : 'bg-emerald-100 text-emerald-700'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
-                                                                {item.status === 'sold' && <span className="px-2 py-1 rounded-full text-xs font-bold bg-red-100 text-red-700">VENDIDO</span>}
-                                                            </td>
-                                                            <td className="p-4 text-gray-600 font-mono">{formatCurrency(item.price)}</td>
-                                                            <td className="p-4 text-right flex justify-end gap-2">
-                                                                <button onClick={() => handleEdit(item)} className="text-blue-600 hover:text-blue-800 p-2 bg-blue-50 rounded"><Icons.Edit className="w-4 h-4"/></button>
-                                                                <button onClick={() => handleDelete(item.id)} className="text-red-500 hover:text-red-700 p-2 bg-red-50 rounded"><Icons.Trash2 className="w-4 h-4"/></button>
-                                                            </td>
-                                                        </tr>
-                                                    ))}
-                                                    {items.length === 0 && <tr><td colSpan="4" className="p-8 text-center text-gray-500">No tienes publicaciones activas.</td></tr>}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </div>
-                                </>
-                            ) : (
-                                <div className="bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-slate-50 text-slate-600 text-sm uppercase"><tr><th className="p-4">Fecha</th><th className="p-4">Cliente</th><th className="p-4">Teléfono</th><th className="p-4">Interés</th></tr></thead>
-                                        <tbody className="divide-y divide-gray-100">
-                                            {leads.length > 0 ? leads.map((lead, idx) => (
-                                                <tr key={idx} className="hover:bg-slate-50">
-                                                    <td className="p-4 text-sm text-gray-500">{new Date(lead.date).toLocaleDateString()}</td>
-                                                    <td className="p-4 font-medium">{lead.name}</td>
-                                                    <td className="p-4 font-mono text-blue-600">{lead.phone}</td>
-                                                    <td className="p-4 text-sm text-gray-600">{lead.itemTitle} (ID: {lead.itemId})</td>
-                                                </tr>
-                                            )) : (
-                                                <tr><td colSpan="4" className="p-8 text-center text-gray-500">No hay solicitudes de visita aún.</td></tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
-                        </main>
-                    </div>
-                );
-            };
-
-            const ListingDetails = ({ item }) => {
-                const [showContactForm, setShowContactForm] = useState(false);
-                const [contactData, setContactData] = useState({ name: '', phone: '' });
-                const [sent, setSent] = useState(false);
-                const [activeImg, setActiveImg] = useState(item.coverIndex);
-
-                const handleContactSubmit = (e) => {
-                    e.preventDefault();
-                    // Guardar Lead
-                    const newLead = {
-                        date: Date.now(),
-                        name: contactData.name,
-                        phone: contactData.phone,
-                        itemId: item.id,
-                        itemTitle: item.title
-                    };
-                    setLeads([newLead, ...leads]);
-
-                    setSent(true);
-                    setTimeout(() => {
-                        setSent(false); setShowContactForm(false); setContactData({name: '', phone: ''});
-                        alert(`¡Gracias ${contactData.name}! Tu solicitud ha sido registrada correctamente en nuestro sistema.`);
-                    }, 2000);
-                };
-
-                return (
-                    <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
-                        <div className="sticky top-0 bg-white/90 backdrop-blur-md shadow-sm p-4 flex justify-between items-center z-10">
-                            <button onClick={() => setView('home')} className="flex items-center gap-2 text-slate-700 hover:text-slate-900 font-medium"><Icons.X className="w-6 h-6"/> Cerrar</button>
-                            <button onClick={(e) => toggleFavorite(e, item.id)} className={`p-2 rounded-full transition ${favorites.includes(item.id) ? 'bg-red-50 text-red-500' : 'bg-gray-100 text-gray-400'}`}>
-                                <Icons.Heart className="w-6 h-6" fill={favorites.includes(item.id)} />
-                            </button>
-                        </div>
-                        <div className="max-w-6xl mx-auto p-4 md:p-8 grid md:grid-cols-2 gap-8 lg:gap-12 pb-20">
-                            <div className="space-y-4">
-                                <div className="aspect-[4/3] w-full rounded-2xl overflow-hidden bg-gray-100 shadow-lg relative">
-                                    <img src={item.images[activeImg]} className="w-full h-full object-cover" />
-                                    {item.status === 'sold' && (
-                                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                                            <span className="border-4 border-red-500 text-red-500 font-black text-5xl uppercase px-6 py-2 transform -rotate-12 tracking-widest bg-white/10 backdrop-blur-sm">VENDIDO</span>
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto pb-2">{item.images.map((img, idx) => (
-                                    <button key={idx} onClick={() => setActiveImg(idx)} className={`relative flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 transition ${activeImg === idx ? 'border-slate-900' : 'border-transparent opacity-60'}`}><img src={img} className="w-full h-full object-cover" /></button>
-                                ))}</div>
-                            </div>
-                            <div className="flex flex-col">
-                                <div className="mb-6">
-                                    <div className="flex gap-2 mb-3">
-                                        <span className={`inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide ${item.type === 'vehicle' ? 'bg-blue-100 text-blue-800' : 'bg-emerald-100 text-emerald-800'}`}>{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
-                                        {item.status === 'sold' && <span className="inline-block px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wide bg-red-600 text-white">VENDIDO</span>}
-                                    </div>
-                                    <h1 className="text-3xl md:text-4xl font-bold text-slate-900 mb-2">{item.title}</h1>
-                                    <p className="text-3xl font-light text-slate-700">{formatCurrency(item.price)}</p>
-                                </div>
-                                <div className="bg-slate-50 p-6 rounded-2xl mb-8"><h3 className="text-sm font-bold text-slate-500 uppercase mb-3">Descripción</h3><p className="text-gray-700 leading-relaxed whitespace-pre-line">{item.description}</p></div>
-                                <div className="mt-auto">
-                                    {item.status === 'sold' ? (
-                                        <button disabled className="w-full bg-gray-300 text-gray-500 py-4 rounded-xl font-bold text-lg cursor-not-allowed">No Disponible</button>
-                                    ) : !showContactForm ? (
-                                        <button onClick={() => setShowContactForm(true)} className="w-full bg-slate-900 text-white py-4 rounded-xl font-bold text-lg hover:bg-slate-800 transition shadow-xl flex items-center justify-center gap-3"><Icons.Calendar className="w-5 h-5"/> Quiero verlo</button>
-                                    ) : (
-                                        <div className="bg-white border border-slate-200 p-6 rounded-2xl shadow-xl animate-fade-in-up">
-                                            <div className="flex justify-between items-center mb-4"><h3 className="font-bold text-lg text-slate-900">Agendar Visita Personal</h3><button onClick={() => setShowContactForm(false)} className="text-gray-400 hover:text-gray-600"><Icons.X className="w-5 h-5"/></button></div>
-                                            {sent ? (
-                                                <div className="text-center py-8 text-green-600"><div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-3"><Icons.Check className="w-6 h-6"/></div><p className="font-bold">¡Solicitud Registrada!</p></div>
-                                            ) : (
-                                                <form onSubmit={handleContactSubmit} className="space-y-4">
-                                                    <div><label className="text-sm font-medium text-gray-700">Tu Nombre</label><input required type="text" value={contactData.name} onChange={(e) => setContactData({...contactData, name: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
-                                                    <div><label className="text-sm font-medium text-gray-700">Teléfono</label><input required type="tel" value={contactData.phone} onChange={(e) => setContactData({...contactData, phone: e.target.value})} className="w-full p-3 bg-gray-50 border border-gray-200 rounded-lg focus:ring-1 focus:ring-slate-900 focus:outline-none"/></div>
-                                                    <button type="submit" className="w-full bg-slate-900 text-white py-3 rounded-lg font-bold">Enviar Solicitud</button>
-                                                </form>
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                );
-            };
-
-            const HomeView = () => {
-                // Filtrar y Ordenar (Vendidos al final)
-                const filteredItems = items
-                    .filter(item => filter === 'all' || item.type === filter)
-                    .sort((a, b) => {
-                        if (a.status === 'sold' && b.status !== 'sold') return 1;
-                        if (a.status !== 'sold' && b.status === 'sold') return -1;
-                        return b.id - a.id; // Más recientes primero (por ID timestamp)
-                    });
-
-                return (
-                    <div className="min-h-screen bg-gray-50 flex flex-col font-sans">
-                        <nav className="bg-white shadow-sm sticky top-0 z-20">
-                            <div className="max-w-7xl mx-auto px-4 py-4 flex justify-between items-center">
-                                <div className="flex items-center gap-2">
-                                    <div className="w-10 h-10 bg-slate-900 rounded-lg flex items-center justify-center text-white"><span className="font-bold text-xl">R</span></div>
-                                    <div className="leading-tight hidden sm:block"><h1 className="font-bold text-slate-900 text-lg">Vehículos y propiedades RR</h1><p className="text-xs text-gray-500 tracking-wider">Exclusivos al precio correcto</p></div>
-                                </div>
-                                <div className="flex gap-2">
-                                    <button onClick={() => setFilter('all')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'all' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Todo</button>
-                                    <button onClick={() => setFilter('vehicle')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'vehicle' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Vehículos</button>
-                                    <button onClick={() => setFilter('property')} className={`px-4 py-2 rounded-full text-sm font-medium transition ${filter === 'property' ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-gray-100'}`}>Propiedades</button>
-                                </div>
-                            </div>
-                        </nav>
-                        <div className="bg-slate-900 text-white py-12 md:py-20 px-4">
-                            <div className="max-w-4xl mx-auto text-center"><h2 className="text-3xl md:text-5xl font-bold mb-4">Encuentra tu próximo sueño</h2><p className="text-slate-300 text-lg">La mejor selección de vehículos y propiedades exclusivas en Guatemala.</p></div>
-                        </div>
-                        <main className="max-w-7xl mx-auto px-4 py-12 w-full flex-grow">
-                            {filteredItems.length === 0 ? (
-                                <div className="text-center py-20"><p className="text-gray-500 text-lg">No hay publicaciones en esta categoría por el momento.</p></div>
-                            ) : (
-                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-                                    {filteredItems.map((item) => (
-                                        <div key={item.id} onClick={() => { setSelectedItem(item); setView('details'); }} className={`bg-white rounded-2xl shadow-sm hover:shadow-xl transition duration-300 overflow-hidden cursor-pointer group border border-gray-100 ${item.status === 'sold' ? 'opacity-75 grayscale-[0.5]' : ''}`}>
-                                            <div className="relative h-64 overflow-hidden">
-                                                <img src={item.images[item.coverIndex]} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition duration-500" />
-                                                <div className="absolute top-3 left-3 flex gap-2">
-                                                    <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-slate-800 shadow-sm">{item.type === 'vehicle' ? 'Vehículo' : 'Propiedad'}</span>
-                                                    {item.status === 'sold' && <span className="bg-red-600 px-3 py-1 rounded-full text-xs font-bold uppercase tracking-wider text-white shadow-sm">VENDIDO</span>}
-                                                </div>
-                                                <button onClick={(e) => toggleFavorite(e, item.id)} className="absolute top-3 right-3 p-2 bg-white/80 backdrop-blur rounded-full hover:bg-white transition shadow-sm">
-                                                    <Icons.Heart className={`w-5 h-5 ${favorites.includes(item.id) ? 'text-red-500' : 'text-slate-700'}`} fill={favorites.includes(item.id)}/>
-                                                </button>
-                                                {item.status === 'sold' && (
-                                                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-                                                        <div className="bg-red-600/90 text-white font-bold text-xl px-6 py-2 transform -rotate-6 shadow-lg border-2 border-white">VENDIDO</div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div className="p-6">
-                                                <div className="flex justify-between items-start mb-2"><h3 className="font-bold text-lg text-slate-900 line-clamp-1">{item.title}</h3></div>
-                                                <p className="text-2xl font-light text-slate-700 mb-4">{formatCurrency(item.price)}</p>
-                                                <p className="text-gray-500 text-sm line-clamp-2 mb-4">{item.description}</p>
-                                                <div className="flex items-center text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition">Ver detalles <span className="ml-1">→</span></div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            )}
-                        </main>
-                        <footer className="bg-white border-t py-8 mt-12">
-                            <div className="max-w-7xl mx-auto px-4 flex flex-col md:flex-row justify-between items-center gap-4">
-                                <p className="text-gray-400 text-sm">© 2024 Vehículos y propiedades RR. Guatemala.</p>
-                                <button onClick={() => setView(isAdmin ? 'adminDashboard' : 'adminLogin')} className="flex items-center gap-2 text-gray-300 hover:text-slate-800 transition text-xs font-medium"><Icons.Lock className="w-3 h-3"/> Acceso Admin</button>
-                            </div>
-                        </footer>
-                    </div>
-                );
-            };
-
-            return view === 'adminLogin' ? <AdminLogin /> 
-                 : view === 'adminDashboard' ? <AdminDashboard /> 
-                 : view === 'create' ? <ListingForm />
-                 : view === 'edit' ? <ListingForm isEdit={true} /> 
-                 : view === 'details' && selectedItem ? <ListingDetails item={selectedItem} /> 
-                 : <HomeView />;
+            // Router simple
+            if (view === 'adminLogin') {
+                return <AdminLogin email={loginEmail} setEmail={setLoginEmail} pass={loginPass} setPass={setLoginPass} onLogin={handleLogin} error={loginError} onBack={() => setView('home')} />;
+            }
+            if (view === 'adminDashboard') {
+                return <AdminDashboard items={items} setItems={setItems} leads={leads} setLeads={setLeads} setView={setView} setIsAdmin={setIsAdmin} formatCurrency={formatCurrency} onEditItem={handleEditItem} />;
+            }
+            if (view === 'create') {
+                return <ListingForm isEdit={false} items={items} setItems={setItems} setView={setView} />;
+            }
+            if (view === 'edit') {
+                return <ListingForm isEdit={true} itemToEdit={itemToEdit} items={items} setItems={setItems} setView={setView} />;
+            }
+            if (view === 'details' && selectedItem) {
+                return <ListingDetails item={selectedItem} setView={setView} favorites={favorites} toggleFavorite={toggleFavorite} leads={leads} setLeads={setLeads} formatCurrency={formatCurrency} />;
+            }
+            return <HomeView items={items} filter={filter} setFilter={setFilter} favorites={favorites} toggleFavorite={toggleFavorite} setSelectedItem={setSelectedItem} setView={setView} isAdmin={isAdmin} formatCurrency={formatCurrency} />;
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
